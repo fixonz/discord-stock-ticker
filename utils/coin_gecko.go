@@ -18,12 +18,12 @@ const (
 
 type CurrentPrice struct {
 	USD float64 `json:"usd"`
-	BTC float64 `json:"btc"`
+	APE float64 `json:"apecoin"`
 }
 
 type TotalValueLocked struct {
 	USD float64 `json:"usd"`
-	BTC float64 `json:"btc"`
+	APE float64 `json:"apecoin"`
 }
 
 type MarketData struct {
@@ -53,9 +53,9 @@ type MarketData struct {
 
 // The following is the API response gecko gives
 type GeckoPriceResults struct {
-	ID            string     `json:"id"`
-	Symbol        string     `json:"symbol"`
-	Name          string     `json:"name"`
+	ID            string     `json:"APECOIN"`
+	Symbol        string     `json:"APE"`
+	Name          string     `json:"apecoin"`
 	MarketData    MarketData `json:"market_data"`
 	MarketCapRank int64       `json:"market_cap_rank"`
 }
