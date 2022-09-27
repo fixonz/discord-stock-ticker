@@ -16,19 +16,6 @@ var (
 	itemSplit = ";"
 )
 
-// BoardRequest represents the json coming in from the request
-type BoardRequest struct {
-	Items     []string `json:"items"`
-	Token     string   `json:"discord_bot_token"`
-	Name      string   `json:"name"`
-	Header    string   `json:"header"`
-	Nickname  bool     `json:"set_nickname"`
-	Crypto    bool     `json:"crypto"`
-	Color     bool     `json:"set_color"`
-	Frequency int      `json:"frequency"`
-	ClientID  string   `json:"client_id"`
-}
-
 // ImportBoard pulls in bots from the provided db
 func (m *Manager) ImportBoard() {
 
@@ -41,26 +28,58 @@ func (m *Manager) ImportBoard() {
 
 	// load existing bots from db
 	for rows.Next() {
-		var clientID, token, name, header, itemsBulk string
-		var nickname, color, crypto bool
-		var frequency int
-		err = rows.Scan(&clientID, &token, &name, &nickname, &color, &crypto, &header, &itemsBulk, &frequency)
+		var importedBoard Board
+		var itemsBulk string
+
+		err = rows.Scan(&importedBoard.ClientID, &importedBoard.Token, &importedBoard.Name, &importedBoard.Nickname, &importedBoard.Color, &importedBoard.Crypto, &importedBoard.Header, &itemsBulk, &importedBoard.Frequency)
 		if err != nil {
 			logger.Errorf("Unable to load token from db: %s", err)
 			continue
 		}
 
-		items := strings.Split(itemsBulk, itemSplit)
-		if crypto {
-			b := NewCryptoBoard(clientID, items, token, name, header, nickname, color, frequency, m.Cache, m.Context)
-			m.addBoard(true, b, false)
+		importedBoard.Items = strings.Split(itemsBulk, itemSplit)
+		if importedBoard.Crypto {
+			go importedBoard.watchCryptoPrice()
+			m.WatchBoard(&importedBoard)
 		} else {
-			b := NewStockBoard(clientID, items, token, name, header, nickname, color, frequency)
-			m.addBoard(true, b, false)
+			go importedBoard.watchStockPrice()
+			m.WatchBoard(&importedBoard)
 		}
-		logger.Infof("Loaded board from db: %s", name)
+		logger.Infof("Loaded board from db: %s", importedBoard.label())
 	}
 	rows.Close()
+
+	// check all entries have id
+	for _, board := range m.WatchingBoard {
+		if board.ClientID == "" {
+			id, err := getIDToken(board.Token)
+			if err != nil {
+				logger.Errorf("Unable to get id from token: %s", err)
+				continue
+			}
+
+			stmt, err := m.DB.Prepare("UPDATE boards SET clientId = ? WHERE token = ?")
+			if err != nil {
+				logger.Errorf("Unable to prepare id update: %s", err)
+				continue
+			}
+
+			res, err := stmt.Exec(id, board.Token)
+			if err != nil {
+				logger.Errorf("Unable to update db: %s", err)
+				continue
+			}
+
+			_, err = res.LastInsertId()
+			if err != nil {
+				logger.Errorf("Unable to confirm db update: %s", err)
+				continue
+			} else {
+				logger.Infof("Updated id in db for %s", board.label())
+				board.ClientID = id
+			}
+		}
+	}
 }
 
 // AddBoard adds a new board to the list of what to watch
@@ -75,16 +94,14 @@ func (m *Manager) AddBoard(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		logger.Errorf("Error: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, "Error reading body: %v", err)
 		return
 	}
 
 	// unmarshal into struct
-	var boardReq BoardRequest
+	var boardReq Board
 	if err := json.Unmarshal(body, &boardReq); err != nil {
 		logger.Errorf("Error unmarshalling: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, "Error unmarshalling: %v", err)
 		return
 	}
 
@@ -92,8 +109,18 @@ func (m *Manager) AddBoard(w http.ResponseWriter, r *http.Request) {
 	if boardReq.Token == "" {
 		logger.Error("Discord token required")
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprint(w, "Error: token required")
 		return
+	}
+
+	// make sure token is valid
+	if boardReq.ClientID == "" {
+		id, err := getIDToken(boardReq.Token)
+		if err != nil {
+			logger.Errorf("Unable to authenticate with discord token: %s", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		boardReq.ClientID = id
 	}
 
 	// ensure frequency is set
@@ -105,128 +132,73 @@ func (m *Manager) AddBoard(w http.ResponseWriter, r *http.Request) {
 	if boardReq.Name == "" {
 		logger.Error("Board Name required")
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprint(w, "Error: name required")
 		return
 	}
 
-	// add stock or crypto ticker
+	// add stock or crypto board
 	if boardReq.Crypto {
 
 		// check if already existing
-		if _, ok := m.WatchingBoard[strings.ToUpper(boardReq.Name)]; ok {
+		if _, ok := m.WatchingBoard[boardReq.label()]; ok {
 			logger.Error("Error: board already exists")
 			w.WriteHeader(http.StatusConflict)
 			return
 		}
 
-		crypto := NewCryptoBoard(boardReq.ClientID, boardReq.Items, boardReq.Token, boardReq.Name, boardReq.Header, boardReq.Nickname, boardReq.Color, boardReq.Frequency, m.Cache, m.Context)
-		m.addBoard(true, crypto, true)
+		go boardReq.watchCryptoPrice()
+		m.WatchBoard(&boardReq)
+	} else {
 
-		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-		w.WriteHeader(http.StatusOK)
-		err = json.NewEncoder(w).Encode(crypto)
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
+		// check if already existing
+		if _, ok := m.WatchingBoard[boardReq.label()]; ok {
+			logger.Error("Error: board already exists")
+			w.WriteHeader(http.StatusConflict)
+			return
 		}
-		logger.Infof("Added board: %s\n", crypto.Name)
-		return
+
+		go boardReq.watchStockPrice()
+		m.WatchBoard(&boardReq)
 	}
 
-	// check if already existing
-	if _, ok := m.WatchingBoard[strings.ToUpper(boardReq.Name)]; ok {
-		logger.Error("Error: board already exists")
-		w.WriteHeader(http.StatusConflict)
-		return
+	if *db != "" {
+		m.StoreBoard(&boardReq)
 	}
-
-	stock := NewStockBoard(boardReq.ClientID, boardReq.Items, boardReq.Token, boardReq.Name, boardReq.Header, boardReq.Nickname, boardReq.Color, boardReq.Frequency)
-	m.addBoard(false, stock, true)
 
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(http.StatusOK)
-	err = json.NewEncoder(w).Encode(stock)
+	err = json.NewEncoder(w).Encode(boardReq)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 	}
-	logger.Infof("Added board: %s\n", stock.Name)
+	logger.Infof("Added board: %s\n", boardReq.Name)
 }
 
-func (m *Manager) addBoard(crypto bool, board *Board, update bool) {
+func (m *Manager) WatchBoard(board *Board) {
 	boardCount.Inc()
-	id := board.Name
+	id := board.label()
 	m.WatchingBoard[id] = board
+}
 
-	var noDB *sql.DB
-	if (m.DB == noDB) || !update {
-		return
-	}
+// StoreBoard puts a board into the db
+func (m *Manager) StoreBoard(board *Board) {
 
-	// query
-	stmt, err := m.DB.Prepare("SELECT id FROM boards WHERE name = ? LIMIT 1")
+	// store new entry in db
+	stmt, err := m.DB.Prepare("INSERT INTO boards(clientId, token, name, nickname, color, crypto, header, items, frequency) values(?,?,?,?,?,?,?,?,?)")
 	if err != nil {
-		logger.Warningf("Unable to query board in db %s: %s", id, err)
+		logger.Warningf("Unable to store board in db %s: %s", board.label(), err)
 		return
 	}
 
-	rows, err := stmt.Query(board.Name)
+	res, err := stmt.Exec(board.ClientID, board.Token, board.Name, board.Nickname, board.Color, board.Crypto, board.Header, strings.Join(board.Items, itemSplit), board.Frequency)
 	if err != nil {
-		logger.Warningf("Unable to query board in db %s: %s", id, err)
+		logger.Warningf("Unable to store board in db %s: %s", board.label(), err)
 		return
 	}
 
-	var existingId int
-
-	for rows.Next() {
-		err = rows.Scan(&existingId)
-		if err != nil {
-			logger.Warningf("Unable to query board in db %s: %s", id, err)
-			return
-		}
-	}
-	rows.Close()
-
-	if existingId != 0 {
-
-		// update entry in db
-		stmt, err := m.DB.Prepare("update boards set clientId = ?, token = ?, name = ?, nickname = ?, color = ?, crypto = ?, header = ?, items = ?, frequency = ? WHERE id = ?")
-		if err != nil {
-			logger.Warningf("Unable to update board in db %s: %s", id, err)
-			return
-		}
-
-		res, err := stmt.Exec(board.ClientID, board.token, board.Name, board.Nickname, board.Color, crypto, board.Header, strings.Join(board.Items, itemSplit), board.Frequency, existingId)
-		if err != nil {
-			logger.Warningf("Unable to update board in db %s: %s", id, err)
-			return
-		}
-
-		_, err = res.LastInsertId()
-		if err != nil {
-			logger.Warningf("Unable to update board in db %s: %s", id, err)
-			return
-		}
-
-		logger.Infof("Updated board in db %s", id)
-	} else {
-
-		// store new entry in db
-		stmt, err := m.DB.Prepare("INSERT INTO boards(clientId, token, name, nickname, color, crypto, header, items, frequency) values(?,?,?,?,?,?,?,?,?)")
-		if err != nil {
-			logger.Warningf("Unable to store board in db %s: %s", id, err)
-			return
-		}
-
-		res, err := stmt.Exec(board.ClientID, board.token, board.Name, board.Nickname, board.Color, crypto, board.Header, strings.Join(board.Items, itemSplit), board.Frequency)
-		if err != nil {
-			logger.Warningf("Unable to store board in db %s: %s", id, err)
-			return
-		}
-
-		_, err = res.LastInsertId()
-		if err != nil {
-			logger.Warningf("Unable to store board in db %s: %s", id, err)
-			return
-		}
+	_, err = res.LastInsertId()
+	if err != nil {
+		logger.Warningf("Unable to store board in db %s: %s", board.label(), err)
+		return
 	}
 }
 
@@ -241,14 +213,14 @@ func (m *Manager) DeleteBoard(w http.ResponseWriter, r *http.Request) {
 	id := vars["id"]
 
 	if _, ok := m.WatchingBoard[id]; !ok {
-		logger.Error("Error: no ticker found")
+		logger.Error("Error: no board found")
 		w.WriteHeader(http.StatusNotFound)
-		fmt.Fprint(w, "Error: ticker not found")
+		fmt.Fprint(w, "Error: board not found")
 		return
 	}
 
 	// send shutdown sign
-	m.WatchingBoard[id].Shutdown()
+	m.WatchingBoard[id].Close <- 1
 	boardCount.Dec()
 
 	var noDB *sql.DB
@@ -290,16 +262,21 @@ func (m *Manager) RestartBoard(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, "Error: board not found")
 		return
 	}
+
 	// send shutdown sign
-	m.WatchingBoard[id].Shutdown()
+	m.WatchingBoard[id].Close <- 1
 
 	// wait twice the update time
 	time.Sleep(time.Duration(m.WatchingBoard[id].Frequency) * 2 * time.Second)
 
-	// start the ticker again
-	m.WatchingBoard[id].Start()
+	// start the board again
+	if m.WatchingBoard[id].Crypto {
+		go m.WatchingBoard[id].watchCryptoPrice()
+	} else {
+		go m.WatchingBoard[id].watchStockPrice()
+	}
 
-	logger.Infof("Restarted ticker %s", id)
+	logger.Infof("Restarted board %s", id)
 	w.WriteHeader(http.StatusNoContent)
 }
 

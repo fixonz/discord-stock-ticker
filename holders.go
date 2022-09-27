@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -15,45 +16,26 @@ type Holders struct {
 	Network   string   `json:"network"`
 	Address   string   `json:"address"`
 	Activity  string   `json:"activity"`
-	Nickname  bool     `json:"set_nickname"`
+	Nickname  bool     `json:"nickname"`
 	Frequency int      `json:"frequency"`
 	ClientID  string   `json:"client_id"`
-	token     string   `json:"-"`
-	close     chan int `json:"-"`
+	Token     string   `json:"discord_bot_token"`
+	Close     chan int `json:"-"`
 }
 
-// NewHolders saves information about the stock and starts up a watcher on it
-func NewHolders(clientID string, network string, address string, activity string, token string, nickname bool, frequency int) *Holders {
-	h := &Holders{
-		Network:   network,
-		Address:   address,
-		Activity:  activity,
-		Nickname:  nickname,
-		Frequency: frequency,
-		ClientID:  clientID,
-		token:     token,
-		close:     make(chan int, 1),
+// label returns a human readble id for this bot
+func (h *Holders) label() string {
+	label := strings.ToLower(fmt.Sprintf("%s-%s", h.Network, h.Address))
+	if len(label) > 32 {
+		label = label[:32]
 	}
-
-	// spin off go routine to watch the price
-	h.Start()
-	return h
-}
-
-// Start begins watching holders
-func (h *Holders) Start() {
-	go h.watchHolders()
-}
-
-// Shutdown sends a signal to shut off the goroutine
-func (h *Holders) Shutdown() {
-	h.close <- 1
+	return label
 }
 
 func (h *Holders) watchHolders() {
 
 	// create a new discord session using the provided bot token.
-	dg, err := discordgo.New("Bot " + h.token)
+	dg, err := discordgo.New("Bot " + h.Token)
 	if err != nil {
 		logger.Errorf("Error creating Discord session: %s\n", err)
 		lastUpdate.With(prometheus.Labels{"type": "holders", "ticker": fmt.Sprintf("%s-%s", h.Network, h.Address), "guild": "None"}).Set(0)
@@ -84,6 +66,9 @@ func (h *Holders) watchHolders() {
 		logger.Errorf("Error getting guilds: %s\n", err)
 		h.Nickname = false
 	}
+	if len(guilds) == 0 {
+		h.Nickname = false
+	}
 
 	// check for frequency override
 	// set to one hour to avoid lockout
@@ -91,18 +76,23 @@ func (h *Holders) watchHolders() {
 		h.Frequency = 3600
 	}
 
+	// perform management operations
+	if *managed {
+		setName(dg, h.label())
+	}
+
+	logger.Infof("Watching holders for %s", h.Address)
 	ticker := time.NewTicker(time.Duration(h.Frequency) * time.Second)
-	var nickname string
 
 	for {
 
 		select {
-		case <-h.close:
+		case <-h.Close:
 			logger.Infof("Shutting down price watching for %s", h.Activity)
 			return
 		case <-ticker.C:
 
-			nickname = utils.GetHolders(h.Network, h.Address)
+			nickname := utils.GetHolders(h.Network, h.Address)
 
 			if h.Nickname {
 
@@ -115,7 +105,6 @@ func (h *Holders) watchHolders() {
 					} else {
 						logger.Debugf("Set nickname in %s: %s\n", g.Name, nickname)
 					}
-					logger.Infof("Set nickname in %s: %s\n", g.Name, nickname)
 					lastUpdate.With(prometheus.Labels{"type": "holders", "ticker": fmt.Sprintf("%s-%s", h.Network, h.Address), "guild": g.Name}).SetToCurrentTime()
 					time.Sleep(time.Duration(h.Frequency) * time.Second)
 				}

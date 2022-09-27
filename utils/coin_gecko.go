@@ -3,12 +3,11 @@ package utils
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/go-redis/redis/v8"
 )
@@ -22,7 +21,13 @@ type CurrentPrice struct {
 	BTC float64 `json:"btc"`
 }
 
+type TotalValueLocked struct {
+	USD float64 `json:"usd"`
+	BTC float64 `json:"btc"`
+}
+
 type MarketData struct {
+<<<<<<< HEAD
 	CurrentPrice            CurrentPrice `json:"current_price"`
 	MarketCap               CurrentPrice `json:"market_cap"`
 	PriceChangePercent      float64      `json:"price_change_percentage_24h"`
@@ -32,6 +37,17 @@ type MarketData struct {
 	TotalSupply             float64      `json:"total_supply"`
 	CirculatingSupply       float64      `json:"circulating_supply"`
 	MarketCapRank           int64        `json:"market_cap_rank"`
+=======
+	CurrentPrice            CurrentPrice     `json:"current_price"`
+	MarketCap               CurrentPrice     `json:"market_cap"`
+	TotalValueLocked        TotalValueLocked `json:"total_value_locked"`
+	PriceChangePercent      float64          `json:"price_change_percentage_24h"`
+	PriceChangeCurrency     CurrentPrice     `json:"price_change_24h_in_currency"`
+	MarketCapChangePercent  float64          `json:"market_cap_change_percentage_24h"`
+	MarketCapChangeCurrency CurrentPrice     `json:"market_cap_change_24h_in_currency"`
+	TotalSupply             float64          `json:"total_supply"`
+	CirculatingSupply       float64          `json:"circulating_supply"`
+>>>>>>> master
 }
 
 
@@ -63,17 +79,7 @@ func GetCryptoPrice(ticker string) (GeckoPriceResults, error) {
 	}
 
 	if resp.StatusCode == 429 {
-		fmt.Println("Being rate limited by coingecko")
-
-		rand.Seed(time.Now().UnixNano())
-		n := rand.Intn(10)
-		time.Sleep(time.Duration(n) * time.Second)
-		secondAttempt, err := GetCryptoPrice(ticker)
-		if err != nil {
-			return price, err
-		} else {
-			return secondAttempt, nil
-		}
+		return price, errors.New("being rate limited by coingecko")
 	}
 
 	results, err := ioutil.ReadAll(resp.Body)
@@ -82,7 +88,6 @@ func GetCryptoPrice(ticker string) (GeckoPriceResults, error) {
 	}
 	err = json.Unmarshal(results, &price)
 	if err != nil {
-		fmt.Printf(resp.Status)
 		return price, err
 	}
 
@@ -93,6 +98,7 @@ func GetCryptoPrice(ticker string) (GeckoPriceResults, error) {
 func GetCryptoPriceCache(client *redis.Client, ctx context.Context, ticker string) (GeckoPriceResults, error) {
 	var currentPrice CurrentPrice
 	var currentMarketCap CurrentPrice
+	var currentValueLocked TotalValueLocked
 	var marketData MarketData
 	var marketCapRank int64
 	var geckoPriceResults GeckoPriceResults
@@ -106,7 +112,6 @@ func GetCryptoPriceCache(client *redis.Client, ctx context.Context, ticker strin
 	price, err := client.Get(ctx, fmt.Sprintf("%s#CurrentPrice", ticker)).Result()
 	if err == redis.Nil {
 		geckoPriceResults, err = GetCryptoPrice(ticker)
-		fmt.Println("cache miss")
 		return geckoPriceResults, err
 	} else if err != nil {
 		geckoPriceResults, err = GetCryptoPrice(ticker)
@@ -144,7 +149,6 @@ func GetCryptoPriceCache(client *redis.Client, ctx context.Context, ticker strin
 	marketCap, err := client.Get(ctx, fmt.Sprintf("%s#MarketCap", ticker)).Result()
 	if err == redis.Nil {
 		geckoPriceResults, err = GetCryptoPrice(ticker)
-		fmt.Println("cache miss")
 		return geckoPriceResults, err
 	} else if err != nil {
 		geckoPriceResults, err = GetCryptoPrice(ticker)
@@ -162,7 +166,6 @@ func GetCryptoPriceCache(client *redis.Client, ctx context.Context, ticker strin
 	btc, err := client.Get(ctx, "bitcoin#CurrentPrice").Result()
 	if err == redis.Nil {
 		geckoPriceResults, err = GetCryptoPrice(ticker)
-		fmt.Println("cache miss on btc")
 		return geckoPriceResults, err
 	} else if err != nil {
 		geckoPriceResults, err = GetCryptoPrice(ticker)
@@ -183,7 +186,6 @@ func GetCryptoPriceCache(client *redis.Client, ctx context.Context, ticker strin
 	priceChange, err := client.Get(ctx, fmt.Sprintf("%s#PriceChange24H", ticker)).Result()
 	if err == redis.Nil {
 		geckoPriceResults, err = GetCryptoPrice(ticker)
-		fmt.Println("cache miss")
 		return geckoPriceResults, err
 	} else if err != nil {
 		geckoPriceResults, err = GetCryptoPrice(ticker)
@@ -203,7 +205,6 @@ func GetCryptoPriceCache(client *redis.Client, ctx context.Context, ticker strin
 	marketCapChange, err := client.Get(ctx, fmt.Sprintf("%s#MarketCapChange24H", ticker)).Result()
 	if err == redis.Nil {
 		geckoPriceResults, err = GetCryptoPrice(ticker)
-		fmt.Println("cache miss")
 		return geckoPriceResults, err
 	} else if err != nil {
 		geckoPriceResults, err = GetCryptoPrice(ticker)
@@ -223,7 +224,6 @@ func GetCryptoPriceCache(client *redis.Client, ctx context.Context, ticker strin
 	priceChangePercent, err := client.Get(ctx, fmt.Sprintf("%s#PriceChangePercentage24H", ticker)).Result()
 	if err == redis.Nil {
 		geckoPriceResults, err = GetCryptoPrice(ticker)
-		fmt.Println("cache miss")
 		return geckoPriceResults, err
 	} else if err != nil {
 		geckoPriceResults, err = GetCryptoPrice(ticker)
@@ -240,7 +240,6 @@ func GetCryptoPriceCache(client *redis.Client, ctx context.Context, ticker strin
 	marketCapChangePercent, err := client.Get(ctx, fmt.Sprintf("%s#MarketCapChangePercentage24H", ticker)).Result()
 	if err == redis.Nil {
 		geckoPriceResults, err = GetCryptoPrice(ticker)
-		fmt.Println("cache miss")
 		return geckoPriceResults, err
 	} else if err != nil {
 		geckoPriceResults, err = GetCryptoPrice(ticker)
@@ -257,7 +256,6 @@ func GetCryptoPriceCache(client *redis.Client, ctx context.Context, ticker strin
 	totalSupply, err = client.Get(ctx, fmt.Sprintf("%s#TotalSupply", ticker)).Result()
 	if err == redis.Nil {
 		geckoPriceResults, err = GetCryptoPrice(ticker)
-		fmt.Println("cache miss")
 		return geckoPriceResults, err
 	} else if err != nil {
 		geckoPriceResults, err = GetCryptoPrice(ticker)
@@ -274,7 +272,6 @@ func GetCryptoPriceCache(client *redis.Client, ctx context.Context, ticker strin
 	circulatingSupply, err = client.Get(ctx, fmt.Sprintf("%s#CirculatingSupply", ticker)).Result()
 	if err == redis.Nil {
 		geckoPriceResults, err = GetCryptoPrice(ticker)
-		fmt.Println("cache miss")
 		return geckoPriceResults, err
 	} else if err != nil {
 		geckoPriceResults, err = GetCryptoPrice(ticker)
@@ -289,6 +286,7 @@ func GetCryptoPriceCache(client *redis.Client, ctx context.Context, ticker strin
 	marketData = MarketData{
 		currentPrice,
 		currentMarketCap,
+		currentValueLocked,
 		priceChangePercentFloat,
 		priceChangeCurrency,
 		marketCapChangePercentFloat,
@@ -301,7 +299,6 @@ func GetCryptoPriceCache(client *redis.Client, ctx context.Context, ticker strin
 	symbol, err = client.Get(ctx, fmt.Sprintf("%s#Symbol", ticker)).Result()
 	if err == redis.Nil {
 		geckoPriceResults, err = GetCryptoPrice(ticker)
-		fmt.Println("cache miss")
 		return geckoPriceResults, err
 	} else if err != nil {
 		geckoPriceResults, err = GetCryptoPrice(ticker)
@@ -312,7 +309,6 @@ func GetCryptoPriceCache(client *redis.Client, ctx context.Context, ticker strin
 	name, err = client.Get(ctx, fmt.Sprintf("%s#Name", ticker)).Result()
 	if err == redis.Nil {
 		geckoPriceResults, err = GetCryptoPrice(ticker)
-		fmt.Println("cache miss")
 		return geckoPriceResults, err
 	} else if err != nil {
 		geckoPriceResults, err = GetCryptoPrice(ticker)
@@ -326,6 +322,5 @@ func GetCryptoPriceCache(client *redis.Client, ctx context.Context, ticker strin
 		marketData,
 	}
 
-	fmt.Println("cache hit")
 	return geckoPriceResults, nil
 }

@@ -2,18 +2,28 @@
 
 Live stock and crypto tickers for your discord server.
 
-Now with five different types of tickers!
+With these bots you can track prices of...
 
-🍾 400+ public tickers with over 15k installs across 3k discord servers!
+- Coins and Tokens on CoinGecko
+- Marketcaps of Coins and Tokens on CoinGecko
+- Stocks on Yahoo Finance
+- Tokens on Pancakeswap
+- Tokens on Dexlab
+- Tokens on 1Inch
+- NFT Collections on OpenSea, Solanart, Solart, and Magiceden
+- Gas on Ethereum, Binance, and Polygon Chains
+- Number of holders of a token on Ethereum and Binance Chains
 
-*Are you just looking to add free tickers to your discord server? Click the discord icon below to join the support server and get the list of avalible bots!*
+🍾 100 public tickers with over 15k installs across 3k discord servers!
 
-[![Releases](https://github.com/rssnyder/discord-stock-ticker/workflows/Build%20and%20Publish%20Container%20Image/badge.svg)](https://github.com/rssnyder/discord-stock-ticker/releases)
+🛠️ Use theis project to host your own tickers, or .[pay for custom tickers to be made](https://github.com/rssnyder/discord-stock-ticker/blob/master/README.md#premium).
+
+[![Publish](https://github.com/rssnyder/discord-stock-ticker/actions/workflows/deploy.yml/badge.svg)](https://github.com/rssnyder/discord-stock-ticker/actions/workflows/deploy.yml)
 [![MIT License](https://img.shields.io/apm/l/atomic-design-ui.svg?)](https://github.com/tterb/atomic-design-ui/blob/master/LICENSEs)
 
-[![GitHub last commit](https://img.shields.io/github/last-commit/rssnyder/discord-stock-ticker.svg?style=flat)]()
-[![GitHub stars](https://img.shields.io/github/stars/rssnyder/discord-stock-ticker.svg?style=social&label=Star)]()
-[![GitHub watchers](https://img.shields.io/github/watchers/rssnyder/discord-stock-ticker.svg?style=social&label=Watch)]()
+[![GitHub last commit](https://img.shields.io/github/last-commit/rssnyder/discord-stock-ticker.svg?style=flat)](https://github.com/rssnyder/discord-stock-ticker/pulse)
+[![GitHub stars](https://img.shields.io/github/stars/rssnyder/discord-stock-ticker.svg?style=social&label=Star)](https://github.com/rssnyder/discord-stock-ticker/pulse)
+[![GitHub watchers](https://img.shields.io/github/watchers/rssnyder/discord-stock-ticker.svg?style=social&label=Watch)](https://github.com/rssnyder/discord-stock-ticker/pulse)
 
 ## Contents
 
@@ -26,50 +36,38 @@ Now with five different types of tickers!
     - [Stocks](#stocks)
     - [Crypto](#crypto)
     - [Gas Prices](#gas-prices)
-    - [Other (not my) crypto discord bots](#other-not-my-crypto-discord-bots)
   - [Premium](#premium)
-  - [Self-Hosting - Docker](#self-hosting---docker)
-  - [Self-Hosting - binary](#self-hosting---binary)
-    - [Roles for colors](#roles-for-colors)
-    - [Using the binary](#using-the-binary)
+  - [Self-Hosting](#self-hosting)
       - [Setting options](#setting-options)
-      - [Systemd service](#systemd-service)
+      - [Systemd (linux)](#systemd-linux)
+  - [Managing bots](#managing-bots)
   - [Stock and Crypto Price Tickers](#stock-and-crypto-price-tickers)
-    - [List current running bots](#list-current-running-bots)
-    - [Add a new bot](#add-a-new-bot)
-    - [Restart a bot](#restart-a-bot)
-    - [Remove a bot](#remove-a-bot)
-  - [Crypto Market Cap](#crypto-market-cap)
-    - [List current running bots](#list-current-running-bots-1)
-    - [Add a new bot](#add-a-new-bot-1)
-    - [Restart a bot](#restart-a-bot-1)
-    - [Remove a bot](#remove-a-bot-1)
+    - [Bot Configuration (stock)](#bot-configuration-stock)
+    - [Bot Configuration (crypto)](#bot-configuration-crypto)
   - [Stock and Crypto Price Tickerboards](#stock-and-crypto-price-tickerboards)
-    - [List current running Boards](#list-current-running-boards)
-    - [Add a new Board](#add-a-new-board)
-    - [Restart a Board](#restart-a-board)
-    - [Remove a Board](#remove-a-board)
+    - [Bot Configuration (stock)](#bot-configuration-stock-1)
+    - [Bot Configuration (crypto)](#bot-configuration-crypto-1)
+  - [Crypto Market Cap](#crypto-market-cap)
+    - [Bot Configuration](#bot-configuration)
+  - [Crypto Circulating Supply](#crypto-circulating-supply)
+    - [Bot Configuration](#bot-configuration-1)
+  - [Crypto Total Value Locked](#crypto-total-value-locked)
+    - [Bot Configuration](#bot-configuration-2)
   - [Ethereum, BSC, and Polygon Gas Prices](#ethereum-bsc-and-polygon-gas-prices)
-    - [List current running Gas](#list-current-running-gas)
-    - [Add a new Gas](#add-a-new-gas)
-    - [Restart a Gas](#restart-a-gas)
-    - [Remove a Gas](#remove-a-gas)
+    - [Bot Configuration](#bot-configuration-3)
   - [Ethereum, BSC, or Polygon Token Holders](#ethereum-bsc-or-polygon-token-holders)
-    - [List current running Holders](#list-current-running-holders)
-    - [Add a new Holder](#add-a-new-holder)
-    - [Restart a Holder](#restart-a-holder)
-    - [Remove a Holder](#remove-a-holder)
+    - [Bot Configuration](#bot-configuration-4)
   - [ETH/BSC/MATIC Token Price](#ethbscmatic-token-price)
-    - [List current running Tokens](#list-current-running-tokens)
-    - [Add a new Token](#add-a-new-token)
-    - [Restart a Token](#restart-a-token)
-    - [Remove a Token](#remove-a-token)
+    - [Bot Configuration](#bot-configuration-5)
+  - [OpenSea/Solanart NFT Collection Floor Price](#openseasolanart-nft-collection-floor-price)
+    - [Bot Configuration](#bot-configuration-6)
+  - [Roles for colors](#roles-for-colors)
   - [Kubernetes](#kubernetes)
   - [Louie](#louie)
 
 ## Preview
 
-![image](https://user-images.githubusercontent.com/7338312/127577682-70b67f31-59c9-427b-b9dc-2736a2b4e378.png)![TICKERS](https://user-images.githubusercontent.com/7338312/126001327-2d7167d2-e998-4e13-9272-61feb4e9bf7a.png)![BOARDS](https://user-images.githubusercontent.com/7338312/126001753-4f0ec66e-5737-495a-a85b-cafeef6f5cea.gif)![image](https://user-images.githubusercontent.com/7338312/127577601-43500287-1cf4-47ee-9f21-67c22f606850.png)![HOLDERS](https://user-images.githubusercontent.com/7338312/126001392-dfb72cc1-d526-40e8-9982-077bb22fc44c.png)
+![image](https://user-images.githubusercontent.com/7338312/127577682-70b67f31-59c9-427b-b9dc-2736a2b4e378.png)![TICKERS](https://user-images.githubusercontent.com/7338312/126001327-2d7167d2-e998-4e13-9272-61feb4e9bf7a.png)![BOARDS](https://user-images.githubusercontent.com/7338312/126001753-4f0ec66e-5737-495a-a85b-cafeef6f5cea.gif)![image](https://user-images.githubusercontent.com/7338312/127577601-43500287-1cf4-47ee-9f21-67c22f606850.png)![HOLDERS](https://user-images.githubusercontent.com/7338312/126001392-dfb72cc1-d526-40e8-9982-077bb22fc44c.png)![FLOOR](https://user-images.githubusercontent.com/7338312/148694075-7ca93668-2ce6-4e26-af9c-1dc032bf6980.png)
 
 ## Join the discord server
 
@@ -195,13 +193,9 @@ Love these bots? You can support this project by subscribing to the [premium ver
 
 [![Ethereum Invite Link](https://user-images.githubusercontent.com/7338312/127579033-8785ed17-2bcc-474c-80d4-8ea356da70e6.png)](https://discord.com/api/oauth2/authorize?client_id=833797002684661821&permissions=0&scope=bot)[![Binance Smart Chain Invite Link](https://user-images.githubusercontent.com/7338312/127578976-d47069cb-c162-4ab5-ad73-be17b2c1796d.png)](https://discord.com/api/oauth2/authorize?client_id=856947934452645898&permissions=0&scope=bot)[![Polygon Invite Link](https://user-images.githubusercontent.com/7338312/127578967-a7097067-9b0a-44d2-baf6-e3541a511c70.png)](https://discord.com/api/oauth2/authorize?client_id=857023179210096674&permissions=0&scope=bot)
 
-### Other (not my) crypto discord bots
-
-[![image](https://user-images.githubusercontent.com/7338312/135726609-f3504a1e-7c2a-457e-9476-b50e0974e764.png)](https://discord.com/oauth2/authorize?client_id=893362064842706994&permissions=0&scope=bot)
-
 ## Premium
 
-For advanced features like faster update times and color changing names on price changes you can subscribe to my premuim offering.
+If you are interested in a ticker that isnt on this list, you can host your own using the code here or pay to have them made for you.
 
 Price per bot (paid monthly): $1
 
@@ -209,106 +203,11 @@ Price per bot (paid yearly):  $10
 
 If you are interested please see the [contact info on my github page](https://github.com/rssnyder) and send me a messgae via your platform of choice (discord perferred). For a live demo, join the support discord linked at the top or bottom of this page.
 
-## Self-Hosting - Docker
+## Self-Hosting
 
-Grab the current release number from the [release page](https://github.com/rssnyder/discord-stock-ticker/releases) and expose your designated API port:
+[Click here](https://youtu.be/LhgCdtE8kmc) to watch a quick video tutorial on how to self-host these bots on linux. There is also an in depth written format [gist here](https://gist.github.com/rssnyder/55eb4e0b18cca399592a557e95b5547b). If you are familar with ansible, I have a [playbook here](https://github.com/rssnyder/isengard/blob/master/playbooks/discord-stock-ticker.yml).
 
-```shell
-docker run -p "8080:8080" ghcr.io/rssnyder/discord-stock-ticker:3.4.1
-```
-
-You can set the config via ENV vars, since we use [namsral/flag](https://github.com/namsral/flag) the variables are the same as the flag inputs, but all uppercase:
-
-When using the binary...
-
-```shell
-  -address="localhost:8080": address:port to bind http server to.
-  -cache=false: enable cache for coingecko
-  -db="": file to store tickers in
-  -frequency=0: set frequency for all tickers
-  -logLevel=0: defines the log level. 0=production builds. 1=dev builds.
-  -redisAddress="localhost:6379": address:port for redis server.
-  -redisDB=0: redis db to use
-  -redisPassword="": redis password
-```
-
-When using env (docker)...
-
-```shell
-export ADDRESS="localhost:8080" # address:port to bind http server to.
-export CACHE=false # enable cache for coingecko
-export DB="" # file to store tickers in
-export FREQUENCY=60 # set frequency for all tickers
-export LOGLEVEL=0 # defines the log level. 0=production builds. 1=dev builds.
-export REDISADDRESS="localhost:6379" # address:port for redis server.
-export REDISDB=0 # redis db to use
-export REDISPASSWORD="" # redis password
-```
-
-```shell
-docker run -p "8080:8080" --env CACHE=true ghcr.io/rssnyder/discord-stock-ticker:3.4.1
-```
-
-Then you can pass a volume to store the state (and at the same time, upgrade to using [docker-compose](https://docs.docker.com/compose/)):
-
-```shell
----
-version: "3"
-services:
-
-  discordstockticker:
-    image: ghcr.io/rssnyder/discord-stock-ticker:3.4.1
-    environment:
-      - DB=/dst.db
-      - CACHE=true
-    volumes:
-      - /home/infra/dst.db:/dst.db
-    ports:
-      - "8112:8080"
-```
-
-## Self-Hosting - binary
-
-This bot is distributed as a docker image and a binary.
-
-The program acts as a manager of one to many bots. You can have one running instance of the program and have any number of bots running within it.
-
-[Click here](https://youtu.be/LhgCdtE8kmc) to watch a quick video tutorial on how to self-host these bots on linux.
-
-If you are using windows and do not have a unix shell to use, you should use powershell. Here is an example of an API call using powershell:
-
-```powershell
-$Body = @{
-  name = "bitcoin"
-  crypto = $true
-  discord_bot_token = "xxxxxxxxxxxxxxxxxxxxxxxxx"
-}
- 
-$Parameters = @{
-    Method = "POST"
-    Uri =  "127.0.0.1:8080/ticker"
-    Body = ($Body | ConvertTo-Json) 
-    ContentType = "application/json"
-}
-
-Invoke-RestMethod @Parameters
-```
-
-### Roles for colors
-
-To enable color changing you will need to create three roles.
-
-The first role is the role the tickers will appear under. It can be named _anything you want_. You need to check the **Display role members seperatly from other online members** option for this role, but _do not_ assign a custom color for this role, leave it default.
-
-Then you need to make two other roles. These roles need to be named _exactly_ **tickers-red** & **tickers-green**. **Do not** check the Display role members seperatly from other online members option for these roles, but do assign colors to these roles, red and green (or whatever color you want to represent gain/loss) respectively.
-
-The last two roles tickers-green and tickers-red need to be below the first role in the role list in your server settings. You should then add all your ticker bots to the first role.
-
-![roles example](https://user-images.githubusercontent.com/7338312/131678207-b1510955-f762-46e3-ae5c-1b5eddb68844.jpg)
-
-### Using the binary
-
-Pull down the latest release for your OS [here](https://github.com/rssnyder/discord-stock-ticker/releases).
+Pull down the latest release for your OS [here](https://github.com/rssnyder/discord-stock-ticker/releases). Extract. Run.
 
 ```shell
 wget https://github.com/rssnyder/discord-stock-ticker/releases/download/v2.0.0/discord-stock-ticker-v3.3.0-linux-amd64.tar.gz
@@ -318,7 +217,7 @@ tar zxf discord-stock-ticker-v3.3.0-linux-amd64.tar.gz
 ./discord-stock-ticker
 ```
 
-#### Setting options
+### Setting options
 
 There are options you can set for the service using flags:
 
@@ -333,7 +232,7 @@ There are options you can set for the service using flags:
   -redisPassword="": redis password
 ```
 
-#### Systemd service
+### Systemd (linux)
 
 The script here (ran as root) will download and install a `discord-stock-ticker` service on your linux machine with an API avalible on port `8080` to manage bots.
 
@@ -355,45 +254,102 @@ systemctl daemon-reload
 systemctl start discord-stock-ticker.service
 ```
 
-If you need to make modifications to the setting of the service, just edit the `/etc/systemd/system/discord-stock-ticker.service` file on the line with `ExecStart=`.
+If you need to make modifications to the setting of the service, just edit the `/etc/systemd/system/discord-stock-ticker.service` file on the line with `ExecStart=`. An example walkthrough can be found in [this issue](https://github.com/rssnyder/discord-stock-ticker/issues/137). Be sure to run `systemctl daemon-reload` to pick up and changes.
 
 Now that you have the service running, you can add bots using the API exposed on the addres and port that the service runs on (this address is shown when you start the service).
 
-## Stock and Crypto Price Tickers
+## Managing bots
 
-### List current running bots
+All bots are controlled via an API interface and follow the same api template for management:
 
-```shell
-curl localhost:8080/ticker
+Available methods:
+  
+```text
+GET     # show all currently running bots and their configuration
+POST    # create a new bot
+PATCH   # restart a running bot
+DELETE  # delete a running bot
 ```
 
-### Add a new bot
+If you are new to using an API to manage things, there are several ways to make API calls:
 
-Stock Payload:
+1) Curl. This is a command available on virtually all Linux distros. Replace anything between < and > with the appropriate information.
+
+The generic format for a curl API call:
+
+```shell
+curl -X <method> -H "Content-type: application/json" -d <inline json or from file> <hostname>:<port>/<bot type>
+```
+
+GET is the default method for curl, so you may omit the method. Also since you're just retrieving your bots, you can omit the -d flag as well.
+
+Get a listing of all your bots:
+
+```shell
+curl localhost:8080/<bot type>
+```
+
+Create a new bot:
+(In this example, the bot configuration is located in a file 'btc.json', in the folder bots/crypo)
+
+```shell
+curl -X POST -H "Content-type: application/json" -d @bots/crypto/btc.json localhost:8080/ticker
+```
+
+Instructions for restarting running bots and deleting bots are forthcoming.
+
+2) Powershell:
+  
+```shell
+$Body = @{
+  name = "bitcoin"
+  crypto = $true
+  discord_bot_token = "xxxxxxxxxxxxxxxxxxxxxxxxx"
+}
+ 
+$Parameters = @{
+    Method = "POST"
+    Uri =  "127.0.0.1:8080/ticker"
+    Body = ($Body | ConvertTo-Json) 
+    ContentType = "application/json"
+}
+
+Invoke-RestMethod @Parameters
+```
+
+3) [postman](https://www.postman.com/)
+
+## Stock and Crypto Price Tickers
+
+bot type: `ticker`
+
+Tracks stock or crypto prices. Uses Yahoo for stock or CoinGecko for crypto.
+
+### Bot Configuration (stock)
 
 ```json
 {
   "ticker": "pfg",                                  # string: symbol for the stock from yahoo finance
   "name": "2) PFG",                                 # string/OPTIONAL: overwrites display name of bot
-  "set_color": true,                                # bool/OPTIONAL: requires set_nickname
+  "color": true,                                    # bool/OPTIONAL: requires nickname
   "decorator": "@",                                 # string/OPTIONAL: what to show instead of arrows
   "currency": "aud",                                # string/OPTIONAL: alternative curreny
   "activity": "Hello;Its;Me",                       # string/OPTIONAL: list of strings to show in activity section
-  "set_nickname": true,                             # bool/OPTIONAL: display information in nickname vs activity
+  "nickname": true,                                 # bool/OPTIONAL: display information in nickname vs activity
   "frequency": 10,                                  # int/OPTIONAL: seconds between refresh
   "twelve_data_key": "xxx",                         # string/OPTIONAL: use twelve data as source, pass in api key
   "discord_bot_token": "xxxxxxxxxxxxxxxxxxxxxxxx"   # string: dicord bot token
 }
 ```
 
-Crypto Payload:
+### Bot Configuration (crypto)
 
 ```json
 {
   "name": "bitcoin",                                # string: name of the crypto from coingecko
   "crypto": true,                                   # bool: always true for crypto
   "ticker": "1) BTC",                               # string/OPTIONAL: overwrites display name of bot
-  "set_color": true,                                # bool/OPTIONAL: requires set_nickname
+  "color": true,                                    # bool/OPTIONAL: requires nickname
   "decorator": "@",                                 # string/OPTIONAL: what to show instead of arrows
   "currency": "aud",                                # string/OPTIONAL: alternative curreny
   "currency_symbol": "AUD",                         # string/OPTIONAL: alternative curreny symbol
@@ -401,119 +357,34 @@ Crypto Payload:
   "pair_flip": true,                                # bool/OPTIONAL: show <pair>/<coin> rather than <coin>/<pair>
   "activity": "Hello;Its;Me",                       # string/OPTIONAL: list of strings to show in activity section
   "decimals": 3,                                    # int/OPTIONAL: set number of decimal places
-  "set_nickname": true,                             # bool/OPTIONAL: display information in nickname vs activity
+  "nickname": true,                                 # bool/OPTIONAL: display information in nickname vs activity
   "frequency": 10,                                  # int/OPTIONAL: seconds between refresh
   "discord_bot_token": "xxxxxxxxxxxxxxxxxxxxxxxx"   # string: dicord bot token
 }
-```
-
-Example:
-
-```shell
-curl -X POST -H "Content-Type: application/json" --data '{
-  "ticker": "pfg",
-  "name": "PFG",
-  "discord_bot_token": "xxxxxxxxxxxxxxxxxxxxxxxxx"
-}' localhost:8080/ticker
-```
-
-### Restart a bot
-
-```shell
-curl -X PATCH localhost:8080/ticker/pfg
-```
-
-```shell
-curl -X PATCH localhost:8080/ticker/bitcoin
-```
-
-### Remove a bot
-
-```shell
-curl -X DELETE localhost:8080/ticker/pfg
-```
-
-```shell
-curl -X DELETE localhost:8080/ticker/bitcoin
-```
-
-## Crypto Market Cap
-
-### List current running bots
-
-```shell
-curl localhost:8080/marketcap
-```
-
-### Add a new bot
-
-```json
-{
-  "name": "bitcoin",                                # string: name of the crypto from coingecko
-  "ticker": "1) BTC",                               # string/OPTIONAL: overwrites display name of bot
-  "set_color": true,                                # bool/OPTIONAL: requires set_nickname
-  "decorator": "@",                                 # string/OPTIONAL: what to show instead of arrows
-  "currency": "aud",                                # string/OPTIONAL: alternative curreny
-  "currency_symbol": "AUD",                         # string/OPTIONAL: alternative curreny symbol
-  "activity": "Hello;Its;Me",                       # string/OPTIONAL: list of strings to show in activity section
-  "decimals": 3,                                    # int/OPTIONAL: set number of decimal places
-  "set_nickname": true,                             # bool/OPTIONAL: display information in nickname vs activity
-  "frequency": 10,                                  # int/OPTIONAL: seconds between refresh
-  "discord_bot_token": "xxxxxxxxxxxxxxxxxxxxxxxx"   # string: dicord bot token
-}
-```
-
-Example:
-
-```shell
-curl -X POST -H "Content-Type: application/json" --data '{
-  "name": "bitcoin",
-  "discord_bot_token": "xxxxxxxxxxxxxxxxxxxxxxxxx"
-}' localhost:8080/marketcap
-```
-
-### Restart a bot
-
-```shell
-curl -X PATCH localhost:8080/marketcap/bitcoin
-```
-
-### Remove a bot
-
-```shell
-curl -X DELETE localhost:8080/marketcap/bitcoin
 ```
 
 ## Stock and Crypto Price Tickerboards
 
-Tickerboards are tickers that rotate though several stocks or cryptos. This bot is a newer release, and is not as stable as the rest of the bots.
+bot type: `tickerboard`
 
-![BOARDS](https://user-images.githubusercontent.com/7338312/126001753-4f0ec66e-5737-495a-a85b-cafeef6f5cea.gif)
+Tracks multiple stock or crypto prices. Uses Yahoo for stock or CoinGecko for crypto.
 
-### List current running Boards
-
-```shell
-curl localhost:8080/tickerboard
-```
-
-### Add a new Board
-
-Stock Payload:
+### Bot Configuration (stock)
 
 ```json
 {
   "name": "Stocks",                                 # string: name of your board
   "items": ["PFG", "GME", "AMC"],                   # list of strings: symbols from yahoo finance to rotate through
   "header": "1. ",                                  # string/OPTIONAL: adds a header to the nickname to help sort bots
-  "set_color": true,                                # bool/OPTIONAL: requires set_nickname
+  "color": true,                                    # bool/OPTIONAL: requires nickname
   "arrows": true,                                   # bool/OPTIONAL: show arrows in ticker names
-  "set_nickname": true,                             # bool/OPTIONAL: display information in nickname vs activity
+  "nickname": true,                                 # bool/OPTIONAL: display information in nickname vs activity
   "frequency": 10,                                  # int/OPTIONAL: seconds between refresh
   "discord_bot_token": "xxxxxxxxxxxxxxxxxxxxxxxx"   # string: dicord bot token
 }
 ```
 
-Crypto Payload:
+### Bot Configuration (crypto)
 
 ```json
 {
@@ -521,154 +392,134 @@ Crypto Payload:
   "crypto": true,                                   # bool: always true for crypto
   "items": ["bitcoin", "ethereum", "dogecoin"],     # list of strings: names from coingecko to rotate through
   "header": "2. ",                                  # string/OPTIONAL: adds a header to the nickname to help sort bots
-  "set_color": true,                                # bool/OPTIONAL: requires set_nickname
+  "color": true,                                    # bool/OPTIONAL: requires nickname
   "arrows": true,                                   # bool/OPTIONAL: show arrows in ticker names
-  "set_nickname": true,                             # bool/OPTIONAL: display information in nickname vs activity
+  "nickname": true,                                 # bool/OPTIONAL: display information in nickname vs activity
   "frequency": 10,                                  # int/OPTIONAL: seconds between refresh
   "discord_bot_token": "xxxxxxxxxxxxxxxxxxxxxxxx"   # string: dicord bot token
 }
 ```
 
-Example:
+## Crypto Market Cap
 
-```shell
-curl -X POST -H "Content-Type: application/json" --data '{
-  "name": "Stocks",
-  "frequency": 3,
-  "set_nickname": true,
-  "set_color": true,
-  "percentage": true,
-  "arrows": true,
-  "discord_bot_token": "xxxxxxx",
-  "items": ["PFG", "GME", "AMC"]
-}' localhost:8080/tickerboard
+bot type: `marketcap`
+
+Tracks the marketcap of a coin. Uses CoinGecko for data.
+
+### Bot Configuration
+
+```json
+{
+  "name": "bitcoin",                                # string: name of the crypto from coingecko
+  "ticker": "1) BTC",                               # string/OPTIONAL: overwrites display name of bot
+  "color": true,                                    # bool/OPTIONAL: requires nickname
+  "decorator": "@",                                 # string/OPTIONAL: what to show instead of arrows
+  "currency": "aud",                                # string/OPTIONAL: alternative curreny
+  "currency_symbol": "AUD",                         # string/OPTIONAL: alternative curreny symbol
+  "activity": "Hello;Its;Me",                       # string/OPTIONAL: list of strings to show in activity section
+  "decimals": 3,                                    # int/OPTIONAL: set number of decimal places
+  "nickname": true,                                 # bool/OPTIONAL: display information in nickname vs activity
+  "frequency": 10,                                  # int/OPTIONAL: seconds between refresh
+  "discord_bot_token": "xxxxxxxxxxxxxxxxxxxxxxxx"   # string: dicord bot token
+}
 ```
 
-### Restart a Board
+## Crypto Circulating Supply
 
-```shell
-curl -X PATCH localhost:8080/tickerboard/stocks
+bot type: `circulating`
+
+Tracks the circulating supply of a coin. Uses CoinGecko for data.
+
+### Bot Configuration
+
+```json
+{
+  "name": "bitcoin",                                # string: name of the crypto from coingecko
+  "ticker": "1) BTC",                               # string/OPTIONAL: overwrites display name of bot
+  "currency_symbol": "BITCOIN",                     # string/OPTIONAL: alternative curreny symbol
+  "activity": "Hello;Its;Me",                       # string/OPTIONAL: list of strings to show in activity section
+  "decimals": 3,                                    # int/OPTIONAL: set number of decimal places
+  "nickname": true,                                 # bool/OPTIONAL: display information in nickname vs activity
+  "frequency": 10,                                  # int/OPTIONAL: seconds between refresh
+  "discord_bot_token": "xxxxxxxxxxxxxxxxxxxxxxxx"   # string: dicord bot token
+}
 ```
 
-### Remove a Board
+## Crypto Total Value Locked
 
-```shell
-curl -X DELETE localhost:8080/tickerboard/stocks
+bot type: `valuelocked`
+
+Tracks the total value locked of a coin. Uses CoinGecko for data.
+
+### Bot Configuration
+
+```json
+{
+  "name": "bitcoin",                                # string: name of the crypto from coingecko
+  "ticker": "1) BTC",                               # string/OPTIONAL: overwrites display name of bot
+  "currency": "aud",                                # string/OPTIONAL: alternative curreny
+  "currency_symbol": "AUD",                         # string/OPTIONAL: alternative curreny symbol
+  "activity": "Hello;Its;Me",                       # string/OPTIONAL: list of strings to show in activity section
+  "decimals": 3,                                    # int/OPTIONAL: set number of decimal places
+  "nickname": true,                                 # bool/OPTIONAL: display information in nickname vs activity
+  "frequency": 10,                                  # int/OPTIONAL: seconds between refresh
+  "discord_bot_token": "xxxxxxxxxxxxxxxxxxxxxxxx"   # string: dicord bot token
+}
 ```
 
-## Ethereum, BSC, and Polygon Gas Prices
+## Gas Prices
 
-These bots shows the current recommended gas prices for three types of transactions. You can choose either the ethereum, binance smart chain, or polygon blockchain.
+bot type: `gas`
 
 ![image](https://user-images.githubusercontent.com/7338312/127577601-43500287-1cf4-47ee-9f21-67c22f606850.png)
 
-### List current running Gas
+Track the gas price on:
+- Ethereum
+- Binance
+- Polygon
+- ..and many more
 
-```shell
-curl localhost:8080/gas
-```
+Uses [Zapper](https://api.zapper.fi/api/static/index.html#/Miscellaneous%20Data%20Endpoints/GasPriceController_getGasPrice) for data. For now always uses the eip1559 chains.
 
-### Add a new Gas
-
-Payload:
+### Bot Configuration
 
 ```json
 {
   "network": "ethereum",                            # string: one of: ethereum, binance-smart-chain, or polygon
-  "set_nickname": true,                             # bool/OPTIONAL: display information in nickname vs activity
+  "nickname": true,                                 # bool/OPTIONAL: display information in nickname vs activity
   "frequency": 10,                                  # int/OPTIONAL: seconds between refresh
   "discord_bot_token": "xxxxxxxxxxxxxxxxxxxxxxxx"   # string: dicord bot token
 }
 ```
 
-Example:
-
-```shell
-curl -X POST -H "Content-Type: application/json" --data '{
-  "network": "polygon",
-  "frequency": 3,
-  "set_nickname": true,
-  "discord_bot_token": "xxxxxxx"
-}' localhost:8080/gas
-```
-
-### Restart a Gas
-
-```shell
-curl -X PATCH localhost:8080/gas/polygon
-```
-
-### Remove a Gas
-
-```shell
-curl -X DELETE localhost:8080/gas/polygon
-```
-
 ## Ethereum, BSC, or Polygon Token Holders
 
-This bot lists the number of addresses that hold a particular token. You can choose from the ethereum or binance smart chain blockchains.
+bot type: `holders`
 
 ![HOLDERS](https://user-images.githubusercontent.com/7338312/126001392-dfb72cc1-d526-40e8-9982-077bb22fc44c.png)
 
-### List current running Holders
+Track the number of token holders on Ethereum or Binance chains. Uses etherscan or bscscan for data.
 
-```shell
-curl localhost:8080/holders
-```
-
-### Add a new Holder
-
-Payload:
+### Bot Configuration
 
 ```json
 {
   "network": "ethereum",                            # string: one of: ethereum, binance-smart-chain, or polygon
   "address": "0x00000000000000000000000000",        # string: address of contract for token
   "activity": "ethereum",                           # string: text to show in activity section of the bot
-  "set_nickname": true,                             # bool/OPTIONAL: display information in nickname vs activity
+  "nickname": true,                                 # bool/OPTIONAL: display information in nickname vs activity
   "frequency": 10,                                  # int/OPTIONAL: seconds between refresh
   "discord_bot_token": "xxxxxxxxxxxxxxxxxxxxxxxx"   # string: dicord bot token
 }
 ```
 
-Example:
-
-```shell
-curl -X POST -H "Content-Type: application/json" --data '{
-  "network": "ethereum",
-  "address": "0x00000000000000",
-  "activity": "Holders of MyToken",
-  "set_nickname": true,
-  "frequency": 120,
-  "discord_bot_token": "xxxxxxx"
-}' localhost:8080/holders
-```
-
-### Restart a Holder
-
-```shell
-curl -X PATCH localhost:8080/holders/ethereum-0x00000000000000
-```
-
-### Remove a Holder
-
-```shell
-curl -X DELETE localhost:8080/holders/ethereum-0x00000000000000
-```
-
 ## ETH/BSC/MATIC Token Price
 
-This bot gets the current rate for a given token. You can choose another token to pair with on price, or by default USDC is used. You can choose either the ethereum, binance smart chain, or polygon blockchain.
+bot type: `token`
 
-### List current running Tokens
+Track the price of a token on Ethereum, Binance, or Polygon chains. Uses 1inch by default, or pancakeswap/dexlab if specified.
 
-```shell
-curl localhost:8080/token
-```
-
-### Add a new Token
-
-Payload:
+### Bot Configuration
 
 ```json
 {
@@ -676,8 +527,8 @@ Payload:
   "name": "my token",                               # string: display name of token
   "contract": "0x00000",                            # string: contract address of token
   "currency": "0x00000",                            # string/OPTIONAL: contract address of token to price against, default is USDC
-  "set_nickname": true,                             # bool/OPTIONAL: display information in nickname vs activity
-  "set_color": true,                                # bool/OPTIONAL: requires set_nickname
+  "nickname": true,                                 # bool/OPTIONAL: display information in nickname vs activity
+  "color": true,                                    # bool/OPTIONAL: requires nickname
   "decorator": "@",                                 # string/OPTIONAL: what to show instead of arrows
   "activity": "Hello;Its;Me",                       # string/OPTIONAL: list of strings to show in activity section
   "source": "pancakeswap",                          # string/OPTIONAL: if the token is a BSC token, you can set pancakeswap here to use it vs 1inch; you can also set dexlab for solana tokens
@@ -686,29 +537,37 @@ Payload:
 }
 ```
 
-Example:
+## OpenSea/Solanart NFT Collection Floor Price
 
-```shell
-curl -X POST -H "Content-Type: application/json" --data '{
-  "network": "polygon",
-  "contract": "0x0000000",
-  "frequency": 3,
-  "set_nickname": true,
-  "discord_bot_token": "xxxxxxx"
-}' localhost:8080/token
+bot type: `floor`
+
+![image](https://user-images.githubusercontent.com/7338312/148694081-9e90f75d-dcef-4a68-b98a-11c37b2b616a.png)
+
+Track the floor price of an NFT collection on OpenSea or Solanart.
+
+### Bot Configuration
+
+```json
+{
+  "marketplace": "opensea",                         # string: one of: opensea, solsea or solanart
+  "name": "ethereum",                               # string: collection name/id from source
+  "nickname": true,                                 # bool/OPTIONAL: display information in nickname vs activity
+  "frequency": 10,                                  # int/OPTIONAL: seconds between refresh
+  "discord_bot_token": "xxxxxxxxxxxxxxxxxxxxxxxx"   # string: dicord bot token
+}
 ```
 
-### Restart a Token
+## Roles for colors
 
-```shell
-curl -X PATCH localhost:8080/token/polygon-0x0000000
-```
+To enable color changing you will need to create three roles.
 
-### Remove a Token
+The first role is the role the tickers will appear under. It can be named _anything you want_. You need to check the **Display role members seperatly from other online members** option for this role, but _do not_ assign a custom color for this role, leave it default.
 
-```shell
-curl -X DELETE localhost:8080/token/polygon-0x0000000
-```
+Then you need to make two other roles. These roles need to be named _exactly_ **tickers-red** & **tickers-green**. **Do not** check the Display role members seperatly from other online members option for these roles, but do assign colors to these roles, red and green (or whatever color you want to represent gain/loss) respectively.
+
+The last two roles tickers-green and tickers-red need to be below the first role in the role list in your server settings. You should then add all your ticker bots to the first role.
+
+![roles example](https://user-images.githubusercontent.com/7338312/131678207-b1510955-f762-46e3-ae5c-1b5eddb68844.jpg)
 
 ## Kubernetes
 

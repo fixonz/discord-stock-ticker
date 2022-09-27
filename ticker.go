@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"math"
 	"strconv"
@@ -39,23 +38,13 @@ type Ticker struct {
 	close          chan int        `json:"-"`
 }
 
-// NewStock saves information about the stock and starts up a watcher on it
-func NewStock(clientID string, ticker string, token string, name string, nickname bool, color bool, decorator string, frequency int, currency string, activity string, decimals int, twelveDataKey string) *Ticker {
-	s := &Ticker{
-		Ticker:        ticker,
-		Name:          name,
-		Nickname:      nickname,
-		Color:         color,
-		Decorator:     decorator,
-		Activity:      activity,
-		Decimals:      decimals,
-		Frequency:     frequency,
-		Currency:      strings.ToUpper(currency),
-		ClientID:      clientID,
-		Crypto:        false,
-		TwelveDataKey: twelveDataKey,
-		token:         token,
-		close:         make(chan int, 1),
+// label returns a human readble id for this bot
+func (s *Ticker) label() string {
+	var label string
+	if s.Crypto {
+		label = strings.ToLower(fmt.Sprintf("%s-%s", s.Name, s.Currency))
+	} else {
+		label = strings.ToLower(fmt.Sprintf("%s-%s", s.Ticker, s.Currency))
 	}
 
 	// spin off go routine to watch the price
@@ -86,27 +75,13 @@ func NewCrypto(clientID string, ticker string, token string, name string, nickna
 		token:          token,
 		close:          make(chan int, 1),
 	}
-
-	// spin off go routine to watch the price
-	s.Start()
-	return s
-}
-
-// Start begins watching a ticker
-func (s *Ticker) Start() {
-	go s.watchCryptoPrice()
-}
-
-// Shutdown sends a signal to shut off the goroutine
-func (s *Ticker) Shutdown() {
-	s.close <- 1
+	return label
 }
 
 func (s *Ticker) watchStockPrice() {
-	var exRate float64
 
 	// create a new discord session using the provided bot token.
-	dg, err := discordgo.New("Bot " + s.token)
+	dg, err := discordgo.New("Bot " + s.Token)
 	if err != nil {
 		logger.Errorf("Creating Discord session: %s", err)
 		lastUpdate.With(prometheus.Labels{"type": "ticker", "ticker": s.Ticker, "guild": "None"}).Set(0)
@@ -121,18 +96,13 @@ func (s *Ticker) watchStockPrice() {
 		return
 	}
 
-	// get bot id
-	botUser, err := dg.User("@me")
-	if err != nil {
-		logger.Errorf("Getting bot id: %s", err)
-		lastUpdate.With(prometheus.Labels{"type": "ticker", "ticker": s.Ticker, "guild": "None"}).Set(0)
-		return
-	}
-
 	// Get guides for bot
 	guilds, err := dg.UserGuilds(100, "", "")
 	if err != nil {
 		logger.Errorf("Getting guilds: %s", err)
+		s.Nickname = false
+	}
+	if len(guilds) == 0 {
 		s.Nickname = false
 	}
 
@@ -147,7 +117,11 @@ func (s *Ticker) watchStockPrice() {
 		if err != nil {
 			logger.Errorf("Unable to fetch exchange rate for %s, default to USD.", s.Currency)
 		} else {
-			exRate = exData.QuoteSummary.Results[0].Price.RegularMarketPrice.Raw
+			if len(exData.QuoteSummary.Results) > 0 {
+				s.Exrate = exData.QuoteSummary.Results[0].Price.RegularMarketPrice.Raw * float64(s.Multiplier)
+			} else {
+				logger.Errorf("Bad exchange rate for %s, default to USD.", s.Currency)
+			}
 		}
 	}
 
@@ -165,13 +139,18 @@ func (s *Ticker) watchStockPrice() {
 		custom_activity = strings.Split(s.Activity, ";")
 	}
 
-	logger.Debugf("Watching stock price for %s", s.Name)
+	// perform management operations
+	if *managed {
+		setName(dg, s.label())
+	}
+
+	logger.Infof("Watching stock price for %s", s.Ticker)
 	ticker := time.NewTicker(time.Duration(s.Frequency) * time.Second)
 
 	// continuously watch
 	for {
 		select {
-		case <-s.close:
+		case <-s.Close:
 			logger.Infof("Shutting down price watching for %s", s.Name)
 			return
 		case <-ticker.C:
@@ -235,8 +214,8 @@ func (s *Ticker) watchStockPrice() {
 				fmtPrice = priceData.QuoteSummary.Results[0].Price.RegularMarketPrice.Fmt
 
 				// Check if conversion is needed
-				if exRate != 0 {
-					rawPrice := exRate * priceData.QuoteSummary.Results[0].Price.RegularMarketPrice.Raw
+				if s.Exrate != 0 {
+					rawPrice := s.Exrate * priceData.QuoteSummary.Results[0].Price.RegularMarketPrice.Raw
 					fmtPrice = strconv.FormatFloat(rawPrice, 'f', 2, 64)
 				}
 
@@ -290,51 +269,13 @@ func (s *Ticker) watchStockPrice() {
 					lastUpdate.With(prometheus.Labels{"type": "ticker", "ticker": s.Ticker, "guild": g.Name}).SetToCurrentTime()
 
 					if s.Color {
-						// get roles for colors
-						var redRole string
-						var greeenRole string
-
-						roles, err := dg.GuildRoles(g.ID)
+						// change bot color
+						err = setRole(dg, s.ClientID, g.ID, increase)
 						if err != nil {
-							logger.Errorf("Getting guilds: %s", err)
-							continue
-						}
-
-						// find role ids
-						for _, r := range roles {
-							if r.Name == "tickers-red" {
-								redRole = r.ID
-							} else if r.Name == "tickers-green" {
-								greeenRole = r.ID
-							}
-						}
-
-						if len(redRole) == 0 || len(greeenRole) == 0 {
-							logger.Error("Unable to find roles for color changes")
-							continue
-						}
-
-						// assign role based on change
-						if increase {
-							err = dg.GuildMemberRoleRemove(g.ID, botUser.ID, redRole)
-							if err != nil {
-								logger.Errorf("Unable to remove role: %s", err)
-							}
-							err = dg.GuildMemberRoleAdd(g.ID, botUser.ID, greeenRole)
-							if err != nil {
-								logger.Errorf("Unable to set role: %s", err)
-							}
-						} else {
-							err = dg.GuildMemberRoleRemove(g.ID, botUser.ID, greeenRole)
-							if err != nil {
-								logger.Errorf("Unable to remove role: %s", err)
-							}
-							err = dg.GuildMemberRoleAdd(g.ID, botUser.ID, redRole)
-							if err != nil {
-								logger.Errorf("Unable to set role: %s", err)
-							}
+							logger.Errorf("Color roles: %s", err)
 						}
 					}
+
 					time.Sleep(time.Duration(s.Frequency) * time.Second)
 				}
 
@@ -382,11 +323,10 @@ func (s *Ticker) watchStockPrice() {
 }
 
 func (s *Ticker) watchCryptoPrice() {
-	var rdb *redis.Client
-	var exRate float64
+	var nilCache *redis.Client
 
 	// create a new discord session using the provided bot token.
-	dg, err := discordgo.New("Bot " + s.token)
+	dg, err := discordgo.New("Bot " + s.Token)
 	if err != nil {
 		logger.Errorf("Creating Discord session: %s", err)
 		lastUpdate.With(prometheus.Labels{"type": "ticker", "ticker": s.Name, "guild": "None"}).Set(0)
@@ -404,7 +344,7 @@ func (s *Ticker) watchCryptoPrice() {
 	// shard into sessions.
 	shards := make([]*discordgo.Session, st.Shards)
 	for i := 0; i < st.Shards; i++ {
-		shards[i], err = discordgo.New("Bot " + s.token)
+		shards[i], err = discordgo.New("Bot " + s.Token)
 		if err != nil {
 			logger.Errorf("Creating Discord sharded session: %s", err)
 			lastUpdate.With(prometheus.Labels{"type": "ticker", "ticker": s.Name, "guild": "None"}).Set(0)
@@ -441,14 +381,6 @@ func (s *Ticker) watchCryptoPrice() {
 		wg.Wait()
 	}
 
-	// get bot id
-	botUser, err := dg.User("@me")
-	if err != nil {
-		logger.Errorf("Getting bot id: %s", err)
-		lastUpdate.With(prometheus.Labels{"type": "ticker", "ticker": s.Name, "guild": "None"}).Set(0)
-		return
-	}
-
 	// Get guides for bot
 	guilds, err := dg.UserGuilds(100, "", "")
 	if err != nil {
@@ -464,12 +396,20 @@ func (s *Ticker) watchCryptoPrice() {
 
 	// If other currency, get rate
 	if s.Currency != "USD" {
+		logger.Infof("Using %s", s.Currency)
 		exData, err := utils.GetStockPrice(s.Currency + "=X")
 		if err != nil {
 			logger.Errorf("Unable to fetch exchange rate for %s, default to USD.", s.Currency)
 		} else {
-			exRate = exData.QuoteSummary.Results[0].Price.RegularMarketPrice.Raw
+			if len(exData.QuoteSummary.Results) > 0 {
+				s.Exrate = exData.QuoteSummary.Results[0].Price.RegularMarketPrice.Raw * float64(s.Multiplier)
+			} else {
+				logger.Errorf("Bad exchange rate for %s, default to USD.", s.Currency)
+				s.Exrate = float64(s.Multiplier)
+			}
 		}
+	} else {
+		s.Exrate = float64(s.Multiplier)
 	}
 
 	// Set arrows if no custom decorator
@@ -484,16 +424,25 @@ func (s *Ticker) watchCryptoPrice() {
 	itrSeed := 0.0
 	if s.Activity != "" {
 		custom_activity = strings.Split(s.Activity, ";")
+		if s.Multiplier != 1 {
+			custom_activity = append(custom_activity, fmt.Sprintf("x%d %s", s.Multiplier, s.Name))
+		}
+	} else if s.Multiplier > 1 {
+		custom_activity = append(custom_activity, fmt.Sprintf("x%d %s", s.Multiplier, strings.ToUpper(s.Name)))
 	}
 
-	// create timer
+	// perform management operations
+	if *managed {
+		setName(dg, s.label())
+	}
+
+	logger.Infof("Watching crypto price for %s", s.Name)
 	ticker := time.NewTicker(time.Duration(s.Frequency) * time.Second)
-	logger.Debugf("Watching crypto price for %s", s.Name)
 
 	// continuously watch
 	for {
 		select {
-		case <-s.close:
+		case <-s.Close:
 			logger.Infof("Shutting down price watching for %s", s.Name)
 			return
 		case <-ticker.C:
@@ -506,10 +455,10 @@ func (s *Ticker) watchCryptoPrice() {
 			var fmtDiffPercent string
 
 			// get the coin price data
-			if s.Cache == rdb {
+			if rdb == nilCache {
 				priceData, err = utils.GetCryptoPrice(s.Name)
 			} else {
-				priceData, err = utils.GetCryptoPriceCache(s.Cache, s.Context, s.Name)
+				priceData, err = utils.GetCryptoPriceCache(rdb, ctx, s.Name)
 				if err != nil {
 					cacheMisses.Inc()
 				} else {
@@ -517,14 +466,19 @@ func (s *Ticker) watchCryptoPrice() {
 				}
 			}
 			if err != nil {
-				logger.Errorf("Unable to fetch stock price for %s: %s", s.Name, err)
+				logger.Errorf("Unable to fetch crypto price for %s: %s", s.Name, err)
+				if strings.Contains(err.Error(), "rate limited") {
+					rateLimited.Inc()
+				} else {
+					updateError.Inc()
+				}
 				continue
 			}
 
 			// Check if conversion is needed
-			if exRate != 0 {
-				priceData.MarketData.CurrentPrice.USD = exRate * priceData.MarketData.CurrentPrice.USD
-				priceData.MarketData.PriceChangeCurrency.USD = exRate * priceData.MarketData.PriceChangeCurrency.USD
+			if s.Exrate > 1.0 {
+				priceData.MarketData.CurrentPrice.USD = s.Exrate * priceData.MarketData.CurrentPrice.USD
+				priceData.MarketData.PriceChangeCurrency.USD = s.Exrate * priceData.MarketData.PriceChangeCurrency.USD
 			}
 
 			// format the price changes
@@ -533,6 +487,8 @@ func (s *Ticker) watchCryptoPrice() {
 
 			// Check for custom decimal places
 			switch s.Decimals {
+			case 0:
+				fmtPrice = fmt.Sprintf("%s%.0f", s.CurrencySymbol, priceData.MarketData.CurrentPrice.USD)
 			case 1:
 				fmtPrice = fmt.Sprintf("%s%.1f", s.CurrencySymbol, priceData.MarketData.CurrentPrice.USD)
 			case 2:
@@ -624,10 +580,10 @@ func (s *Ticker) watchCryptoPrice() {
 
 					// get price of target pair
 					var pairPriceData utils.GeckoPriceResults
-					if s.Cache == rdb {
+					if rdb == nilCache {
 						pairPriceData, err = utils.GetCryptoPrice(s.Pair)
 					} else {
-						pairPriceData, err = utils.GetCryptoPriceCache(s.Cache, s.Context, s.Pair)
+						pairPriceData, err = utils.GetCryptoPriceCache(rdb, ctx, s.Pair)
 					}
 					if err != nil {
 						logger.Errorf("Unable to fetch pair price for %s: %s", s.Pair, err)
@@ -653,7 +609,7 @@ func (s *Ticker) watchCryptoPrice() {
 						}
 					}
 				} else {
-					if priceData.MarketData.PriceChangeCurrency.USD < 0.01 {
+					if math.Abs(priceData.MarketData.PriceChangeCurrency.USD) < 0.01 {
 						activity = fmt.Sprintf("%s%%", fmtDiffPercent)
 					} else {
 						activity = fmt.Sprintf("%s%s (%s%%)", changeHeader, fmtChange, fmtDiffPercent)
@@ -670,54 +626,14 @@ func (s *Ticker) watchCryptoPrice() {
 					logger.Debugf("Set nickname in %s: %s", g.Name, nickname)
 					lastUpdate.With(prometheus.Labels{"type": "ticker", "ticker": s.Name, "guild": g.Name}).SetToCurrentTime()
 
-					// change coin color
 					if s.Color {
-						var redRole string
-						var greeenRole string
-
-						// get the roles for color changing
-						roles, err := dg.GuildRoles(g.ID)
+						// change bot color
+						err = setRole(dg, s.ClientID, g.ID, increase)
 						if err != nil {
-							logger.Errorf("Getting guilds: %s", err)
-							continue
-						}
-
-						// find role ids
-						for _, r := range roles {
-							if r.Name == "tickers-red" {
-								redRole = r.ID
-							} else if r.Name == "tickers-green" {
-								greeenRole = r.ID
-							}
-						}
-
-						// make sure roles exist
-						if len(redRole) == 0 || len(greeenRole) == 0 {
-							logger.Error("Unable to find roles for color changes")
-							continue
-						}
-
-						// assign role based on change
-						if increase {
-							err = dg.GuildMemberRoleRemove(g.ID, botUser.ID, redRole)
-							if err != nil {
-								logger.Errorf("Unable to remove role: %s", err)
-							}
-							err = dg.GuildMemberRoleAdd(g.ID, botUser.ID, greeenRole)
-							if err != nil {
-								logger.Errorf("Unable to set role: %s", err)
-							}
-						} else {
-							err = dg.GuildMemberRoleRemove(g.ID, botUser.ID, greeenRole)
-							if err != nil {
-								logger.Errorf("Unable to remove role: %s", err)
-							}
-							err = dg.GuildMemberRoleAdd(g.ID, botUser.ID, redRole)
-							if err != nil {
-								logger.Errorf("Unable to set role: %s", err)
-							}
+							logger.Errorf("Color roles: %s", err)
 						}
 					}
+
 					time.Sleep(time.Duration(s.Frequency) * time.Second)
 				}
 

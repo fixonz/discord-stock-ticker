@@ -6,27 +6,10 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
 )
-
-// TokenRequest represents the json coming in from the request
-type TokenRequest struct {
-	Network   string `json:"network"`
-	Contract  string `json:"contract"`
-	Token     string `json:"discord_bot_token"`
-	Name      string `json:"name"`
-	Nickname  bool   `json:"set_nickname"`
-	Frequency int    `json:"frequency" default:"60"`
-	Color     bool   `json:"set_color"`
-	Decorator string `json:"decorator" default:"-"`
-	Activity  string `json:"activity"`
-	Decimals  int    `json:"decimals"`
-	Source    string `json:"source"`
-	ClientID  string `json:"client_id"`
-}
 
 // ImportToken pulls in bots from the provided db
 func (m *Manager) ImportToken() {
@@ -40,21 +23,52 @@ func (m *Manager) ImportToken() {
 
 	// load existing bots from db
 	for rows.Next() {
-		var clientID, token, name, activity, network, contract, decorator, source string
-		var nickname, color bool
-		var decimals, frequency int
-		err = rows.Scan(&clientID, &token, &name, &nickname, &color, &activity, &network, &contract, &decorator, &decimals, &source, &frequency)
+		var importedToken Token
+
+		err = rows.Scan(&importedToken.ClientID, &importedToken.Token, &importedToken.Name, &importedToken.Nickname, &importedToken.Color, &importedToken.Activity, &importedToken.Network, &importedToken.Contract, &importedToken.Decorator, &importedToken.Decimals, &importedToken.Source, &importedToken.Frequency)
 		if err != nil {
 			logger.Errorf("Unable to load token from db: %s", err)
 			continue
 		}
 
 		// activate bot
-		t := NewToken(clientID, network, contract, token, name, nickname, frequency, decimals, activity, color, decorator, source)
-		m.addToken(t, false)
-		logger.Infof("Loaded token from db: %s-%s", network, contract)
+		go importedToken.watchTokenPrice()
+		m.WatchToken(&importedToken)
+		logger.Infof("Loaded token from db: %s", importedToken.label())
 	}
 	rows.Close()
+
+	// check all entries have id
+	for _, token := range m.WatchingToken {
+		if token.ClientID == "" {
+			id, err := getIDToken(token.Token)
+			if err != nil {
+				logger.Errorf("Unable to get id from token: %s", err)
+				continue
+			}
+
+			stmt, err := m.DB.Prepare("UPDATE tokens SET clientId = ? WHERE token = ?")
+			if err != nil {
+				logger.Errorf("Unable to prepare id update: %s", err)
+				continue
+			}
+
+			res, err := stmt.Exec(id, token.Token)
+			if err != nil {
+				logger.Errorf("Unable to update db: %s", err)
+				continue
+			}
+
+			_, err = res.LastInsertId()
+			if err != nil {
+				logger.Errorf("Unable to confirm db update: %s", err)
+				continue
+			} else {
+				logger.Infof("Updated id in db for %s", token.label())
+				token.ClientID = id
+			}
+		}
+	}
 }
 
 // AddToken adds a new Token or crypto to the list of what to watch
@@ -62,7 +76,7 @@ func (m *Manager) AddToken(w http.ResponseWriter, r *http.Request) {
 	m.Lock()
 	defer m.Unlock()
 
-	logger.Debugf("Got an API request to add a ticker")
+	logger.Debugf("Got an API request to add a token")
 
 	// read body
 	body, err := ioutil.ReadAll(r.Body)
@@ -74,7 +88,7 @@ func (m *Manager) AddToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// unmarshal into struct
-	var tokenReq TokenRequest
+	var tokenReq Token
 	if err := json.Unmarshal(body, &tokenReq); err != nil {
 		logger.Errorf("Error unmarshalling: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -88,6 +102,17 @@ func (m *Manager) AddToken(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprint(w, "Error: token required")
 		return
+	}
+
+	// make sure token is valid
+	if tokenReq.ClientID == "" {
+		id, err := getIDToken(tokenReq.Token)
+		if err != nil {
+			logger.Errorf("Unable to authenticate with discord token: %s", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		tokenReq.ClientID = id
 	}
 
 	// ensure frequency is set
@@ -109,100 +134,54 @@ func (m *Manager) AddToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// check if already existing
-	if _, ok := m.WatchingToken[strings.ToUpper(tokenReq.Contract)]; ok {
-		logger.Error("Error: ticker already exists")
+	if _, ok := m.WatchingToken[tokenReq.label()]; ok {
+		logger.Error("Error: token already exists")
 		w.WriteHeader(http.StatusConflict)
 		return
 	}
 
-	token := NewToken(tokenReq.ClientID, tokenReq.Network, tokenReq.Contract, tokenReq.Token, tokenReq.Name, tokenReq.Nickname, tokenReq.Frequency, tokenReq.Decimals, tokenReq.Activity, tokenReq.Color, tokenReq.Decorator, tokenReq.Source)
-	m.addToken(token, true)
+	go tokenReq.watchTokenPrice()
+	m.WatchToken(&tokenReq)
+
+	if *db != "" {
+		m.StoreToken(&tokenReq)
+	}
 
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(http.StatusOK)
-	err = json.NewEncoder(w).Encode(token)
+	err = json.NewEncoder(w).Encode(tokenReq)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 	}
-	logger.Infof("Added token: %s-%s\n", token.Network, token.Contract)
+	logger.Infof("Added token: %s-%s\n", tokenReq.Network, tokenReq.Contract)
 }
 
-func (m *Manager) addToken(token *Token, update bool) {
+func (m *Manager) WatchToken(token *Token) {
 	tokenCount.Inc()
-	id := fmt.Sprintf("%s-%s", token.Network, token.Contract)
+	id := token.label()
 	m.WatchingToken[id] = token
+}
 
-	var noDB *sql.DB
-	if (m.DB == noDB) || !update {
-		return
-	}
+// StoreTicker puts a token into the db
+func (m *Manager) StoreToken(token *Token) {
 
-	// query
-	stmt, err := m.DB.Prepare("SELECT id FROM tokens WHERE network = ? AND contract = ? LIMIT 1")
+	// store new entry in db
+	stmt, err := m.DB.Prepare("INSERT INTO tokens(clientId, token, name, nickname, color, activity, network, contract, decorator, decimals, source, frequency) values(?,?,?,?,?,?,?,?,?,?,?,?)")
 	if err != nil {
-		logger.Warningf("Unable to query token in db %s: %s", id, err)
+		logger.Warningf("Unable to store token in db %s: %s", token.label(), err)
 		return
 	}
 
-	rows, err := stmt.Query(token.Network, token.Contract)
+	res, err := stmt.Exec(token.ClientID, token.Token, token.Name, token.Nickname, token.Color, token.Activity, token.Network, token.Contract, token.Decorator, token.Decimals, token.Source, token.Frequency)
 	if err != nil {
-		logger.Warningf("Unable to query token in db %s: %s", id, err)
+		logger.Warningf("Unable to store token in db %s: %s", token.label(), err)
 		return
 	}
 
-	var existingId int
-
-	for rows.Next() {
-		err = rows.Scan(&existingId)
-		if err != nil {
-			logger.Warningf("Unable to query token in db %s: %s", id, err)
-			return
-		}
-	}
-	rows.Close()
-
-	if existingId != 0 {
-
-		// update entry in db
-		stmt, err := m.DB.Prepare("update tokens set clientId = ?, token = ?, name = ?, nickname = ?, color = ?, activity = ?, network = ?, contract = ?, decorator = ?, decimals = ?, source = ?, frequency = ? WHERE id = ?")
-		if err != nil {
-			logger.Warningf("Unable to update token in db %s: %s", id, err)
-			return
-		}
-
-		res, err := stmt.Exec(token.ClientID, token.token, token.Name, token.Nickname, token.Color, token.Activity, token.Network, token.Contract, token.Decorator, token.Decimals, token.Source, token.Frequency, existingId)
-		if err != nil {
-			logger.Warningf("Unable to update token in db %s: %s", id, err)
-			return
-		}
-
-		_, err = res.LastInsertId()
-		if err != nil {
-			logger.Warningf("Unable to update token in db %s: %s", id, err)
-			return
-		}
-
-		logger.Infof("Updated token in db %s", id)
-	} else {
-
-		// store new entry in db
-		stmt, err := m.DB.Prepare("INSERT INTO tokens(clientId, token, name, nickname, color, activity, network, contract, decorator, decimals, source, frequency) values(?,?,?,?,?,?,?,?,?,?,?,?)")
-		if err != nil {
-			logger.Warningf("Unable to store token in db %s: %s", id, err)
-			return
-		}
-
-		res, err := stmt.Exec(token.ClientID, token.token, token.Name, token.Nickname, token.Color, token.Activity, token.Network, token.Contract, token.Decorator, token.Decimals, token.Source, token.Frequency)
-		if err != nil {
-			logger.Warningf("Unable to store token in db %s: %s", id, err)
-			return
-		}
-
-		_, err = res.LastInsertId()
-		if err != nil {
-			logger.Warningf("Unable to store token in db %s: %s", id, err)
-			return
-		}
+	_, err = res.LastInsertId()
+	if err != nil {
+		logger.Warningf("Unable to store token in db %s: %s", token.label(), err)
+		return
 	}
 }
 
@@ -211,20 +190,20 @@ func (m *Manager) DeleteToken(w http.ResponseWriter, r *http.Request) {
 	m.Lock()
 	defer m.Unlock()
 
-	logger.Debugf("Got an API request to delete a ticker")
+	logger.Debugf("Got an API request to delete a token")
 
 	vars := mux.Vars(r)
 	id := vars["id"]
 
 	if _, ok := m.WatchingToken[id]; !ok {
-		logger.Error("Error: no ticker found")
+		logger.Error("Error: no token found")
 		w.WriteHeader(http.StatusNotFound)
-		fmt.Fprint(w, "Error: ticker not found")
+		fmt.Fprint(w, "Error: token not found")
 		return
 	}
 
 	// send shutdown sign
-	m.WatchingToken[id].Shutdown()
+	m.WatchingToken[id].Close <- 1
 	tokenCount.Dec()
 
 	var noDB *sql.DB
@@ -246,7 +225,7 @@ func (m *Manager) DeleteToken(w http.ResponseWriter, r *http.Request) {
 	// remove from cache
 	delete(m.WatchingToken, id)
 
-	logger.Infof("Deleted ticker %s", id)
+	logger.Infof("Deleted token %s", id)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -261,22 +240,22 @@ func (m *Manager) RestartToken(w http.ResponseWriter, r *http.Request) {
 	id := vars["id"]
 
 	if _, ok := m.WatchingToken[id]; !ok {
-		logger.Error("Error: no ticker found")
+		logger.Error("Error: no token found")
 		w.WriteHeader(http.StatusNotFound)
-		fmt.Fprint(w, "Error: ticker not found")
+		fmt.Fprint(w, "Error: token not found")
 		return
 	}
 
 	// send shutdown sign
-	m.WatchingToken[id].Shutdown()
+	m.WatchingToken[id].Close <- 1
 
 	// wait twice the update time
 	time.Sleep(time.Duration(m.WatchingToken[id].Frequency) * 2 * time.Second)
 
-	// start the ticker again
-	m.WatchingToken[id].Start()
+	// start the token again
+	go m.WatchingToken[id].watchTokenPrice()
 
-	logger.Infof("Restarted ticker %s", id)
+	logger.Infof("Restarted token %s", id)
 	w.WriteHeader(http.StatusNoContent)
 }
 
